@@ -1,16 +1,33 @@
 
-import java.awt.Color;
-import java.util.ArrayList;
-import javax.swing.JTextArea;
-import javax.swing.text.DefaultHighlighter;
+import java.awt.BorderLayout;
 import javax.swing.text.Highlighter;
+import java.awt.Color;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.swing.BorderFactory;
+import javax.swing.JFrame;
+import javax.swing.JMenuItem;
+import javax.swing.JPanel;
+import javax.swing.JTextArea;
+import javax.swing.event.MouseInputAdapter;
+import javax.swing.text.DefaultEditorKit;
+import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.Style;
+import javax.swing.text.StyleContext;
+import javax.swing.text.StyledDocument;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-
 /**
  *
  * @author npilusa
@@ -21,27 +38,52 @@ public class Gui extends javax.swing.JFrame {
     String text;
     String currentWord = "";
     String correction = "";
-    
+    boolean language = true;
+
     //Markers
     int sentNo = 0;//Which sentence
     int wordNo = 0;//Which word in a sentence
     int pos = 0; //The word position in the text area
     boolean endOfText = false;
     boolean highlightSet = false; //Used to clear text area
-    
+
     Highlighter.HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.YELLOW);
     ArrayList<String> once = new ArrayList<>(); //Ignored once
     ArrayList<String> all = new ArrayList<>(); //Ignored all
-    
+
     /**
      * Creates new form Gui
      */
     public Gui() {
         m = new Model();
         initComponents();
-        
+
+        //Edit option in toolbar
+        cutMenuItem.addActionListener(new DefaultEditorKit.CutAction());
+        copyMenuItem.addActionListener(new DefaultEditorKit.CopyAction());
+        pasteMenuItem.addActionListener(new DefaultEditorKit.PasteAction());
+
+        //Popup menu in textarea
+        textPane.addMouseListener(new PopupListener());
+        popup.add(new JMenuItem(new DefaultEditorKit.CopyAction()));
+        popup.add(new JMenuItem(new DefaultEditorKit.CutAction()));
+        popup.add(new JMenuItem(new DefaultEditorKit.PasteAction()));
+
+        //Help window
         textarea = new JTextArea(40, 50);
         textarea.setEditable(false);
+
+        helpPanel = new JPanel();
+        helpPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        helpPanel.setLayout(new BorderLayout(5, 5));
+        helpPanel.add(textarea, BorderLayout.CENTER);
+
+        helpWindow = new JFrame("Help");
+        helpWindow.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        helpWindow.getContentPane().add(helpPanel);
+        helpWindow.pack();
+        helpWindow.setLocationByPlatform(true);
+        helpWindow.setVisible(false);
     }
 
     /**
@@ -55,26 +97,27 @@ public class Gui extends javax.swing.JFrame {
 
         jButton1 = new javax.swing.JButton();
         jLabel3 = new javax.swing.JLabel();
-        jScrollPane1 = new javax.swing.JScrollPane();
-        textarea = new javax.swing.JTextArea();
-        jLabel1 = new javax.swing.JLabel();
+        popup = new javax.swing.JPopupMenu();
+        suggestionsLabel = new javax.swing.JLabel();
         jScrollPane2 = new javax.swing.JScrollPane();
-        jTextPane1 = new javax.swing.JTextPane();
+        suggestionsPanel = new javax.swing.JTextPane();
         exit = new javax.swing.JButton();
-        jLabel2 = new javax.swing.JLabel();
+        instruction = new javax.swing.JLabel();
         change = new javax.swing.JButton();
         changeAll = new javax.swing.JButton();
         ignoreOnce = new javax.swing.JButton();
         ignoreAll = new javax.swing.JButton();
         add = new javax.swing.JButton();
-        run = new javax.swing.JButton();
-        step = new javax.swing.JButton();
-        clear = new javax.swing.JButton();
-        save = new javax.swing.JButton();
+        runButton = new javax.swing.JButton();
+        stepButton = new javax.swing.JButton();
+        clearButton = new javax.swing.JButton();
+        saveButton = new javax.swing.JButton();
         logo = new javax.swing.JLabel();
-        help = new javax.swing.JButton();
-        paste = new javax.swing.JButton();
-        copy = new javax.swing.JButton();
+        helpButton = new javax.swing.JButton();
+        pasteButton = new javax.swing.JButton();
+        copyButton = new javax.swing.JButton();
+        jScrollPane3 = new javax.swing.JScrollPane();
+        textPane = new javax.swing.JTextPane();
         menuBar = new javax.swing.JMenuBar();
         fileMenu = new javax.swing.JMenu();
         openMenuItem = new javax.swing.JMenuItem();
@@ -96,17 +139,18 @@ public class Gui extends javax.swing.JFrame {
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
-        textarea.setColumns(20);
-        textarea.setRows(5);
-        jScrollPane1.setViewportView(textarea);
+        suggestionsLabel.setText("Suggestions");
 
-        jLabel1.setText("Suggestions");
-
-        jScrollPane2.setViewportView(jTextPane1);
+        jScrollPane2.setViewportView(suggestionsPanel);
 
         exit.setText("Exit");
+        exit.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                exitActionPerformed(evt);
+            }
+        });
 
-        jLabel2.setText("Instruction");
+        instruction.setText("Instruction");
 
         change.setText("Change");
 
@@ -123,27 +167,39 @@ public class Gui extends javax.swing.JFrame {
 
         add.setText("Add to ..");
 
-        run.setText("Run");
+        runButton.setText("Run");
 
-        step.setText("Step");
+        stepButton.setText("Step");
 
-        clear.setText("Clear");
+        clearButton.setText("Clear");
 
-        save.setText("Save");
-        save.addActionListener(new java.awt.event.ActionListener() {
+        saveButton.setText("Save");
+        saveButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                saveActionPerformed(evt);
+                saveButtonActionPerformed(evt);
             }
         });
 
         logo.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/ukzn_logo.png"))); // NOI18N
         logo.setText("icon");
 
-        help.setText("Help");
+        helpButton.setText("Help");
+        helpButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                helpButtonActionPerformed(evt);
+            }
+        });
 
-        paste.setText("Paste");
+        pasteButton.setText("Paste");
 
-        copy.setText("Copy");
+        copyButton.setText("Copy");
+
+        textPane.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyTyped(java.awt.event.KeyEvent evt) {
+                textPaneKeyTyped(evt);
+            }
+        });
+        jScrollPane3.setViewportView(textPane);
 
         fileMenu.setMnemonic('f');
         fileMenu.setText("File");
@@ -213,33 +269,31 @@ public class Gui extends javax.swing.JFrame {
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                .addContainerGap()
+                .addGap(23, 23, 23)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jScrollPane2)
+                            .addComponent(instruction, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                             .addGroup(layout.createSequentialGroup()
-                                .addComponent(run)
-                                .addGap(18, 18, 18)
-                                .addComponent(step)
-                                .addGap(18, 18, 18)
-                                .addComponent(save)
-                                .addGap(18, 18, 18)
-                                .addComponent(copy)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(paste)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(clear)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(help))
-                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
-                                        .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 710, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addGap(0, 0, Short.MAX_VALUE))
-                                    .addComponent(jScrollPane2, javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(jScrollPane1, javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(jLabel2, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                                .addGap(24, 24, 24)))
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addGroup(layout.createSequentialGroup()
+                                        .addComponent(runButton)
+                                        .addGap(18, 18, 18)
+                                        .addComponent(stepButton)
+                                        .addGap(18, 18, 18)
+                                        .addComponent(saveButton)
+                                        .addGap(18, 18, 18)
+                                        .addComponent(copyButton)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                        .addComponent(pasteButton)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                        .addComponent(clearButton)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                        .addComponent(helpButton))
+                                    .addComponent(suggestionsLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 710, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addGap(0, 4, Short.MAX_VALUE))
+                            .addComponent(jScrollPane3))
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(layout.createSequentialGroup()
                                 .addGap(20, 20, 20)
@@ -256,37 +310,38 @@ public class Gui extends javax.swing.JFrame {
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                             .addComponent(changeAll, javax.swing.GroupLayout.PREFERRED_SIZE, 191, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addComponent(change, javax.swing.GroupLayout.PREFERRED_SIZE, 191, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                .addContainerGap())
+                .addGap(21, 21, 21))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(run, javax.swing.GroupLayout.Alignment.TRAILING)
-                            .addGroup(layout.createSequentialGroup()
-                                .addContainerGap()
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                    .addComponent(step)
-                                    .addComponent(clear)
-                                    .addComponent(save)
-                                    .addComponent(help)
-                                    .addComponent(paste)
-                                    .addComponent(copy))))
-                        .addGap(18, 18, 18)
-                        .addComponent(jScrollPane1))
-                    .addGroup(layout.createSequentialGroup()
                         .addGap(28, 28, 28)
-                        .addComponent(logo, javax.swing.GroupLayout.DEFAULT_SIZE, 168, Short.MAX_VALUE)
+                        .addComponent(logo, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addComponent(ignoreOnce, javax.swing.GroupLayout.PREFERRED_SIZE, 40, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(18, 18, 18)
                         .addComponent(ignoreAll, javax.swing.GroupLayout.PREFERRED_SIZE, 39, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(add)))
-                .addGap(23, 23, 23)
-                .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(add)
+                        .addGap(44, 44, 44))
+                    .addGroup(layout.createSequentialGroup()
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(runButton, javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addGroup(layout.createSequentialGroup()
+                                .addContainerGap()
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                    .addComponent(stepButton)
+                                    .addComponent(clearButton)
+                                    .addComponent(saveButton)
+                                    .addComponent(helpButton)
+                                    .addComponent(pasteButton)
+                                    .addComponent(copyButton))))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jScrollPane3)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)))
+                .addComponent(suggestionsLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addGroup(layout.createSequentialGroup()
@@ -294,10 +349,10 @@ public class Gui extends javax.swing.JFrame {
                         .addGap(18, 18, 18)
                         .addComponent(changeAll, javax.swing.GroupLayout.PREFERRED_SIZE, 29, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(15, 15, 15))
-                    .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 122, Short.MAX_VALUE))
+                    .addComponent(jScrollPane2))
                 .addGap(18, 18, 18)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 40, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(instruction, javax.swing.GroupLayout.PREFERRED_SIZE, 40, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(exit, javax.swing.GroupLayout.DEFAULT_SIZE, 36, Short.MAX_VALUE))
                 .addGap(25, 25, 25))
         );
@@ -315,9 +370,82 @@ public class Gui extends javax.swing.JFrame {
         // TODO add your handling code here:
     }//GEN-LAST:event_ignoreAllActionPerformed
 
-    private void saveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveActionPerformed
+    private void saveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveButtonActionPerformed
         // TODO add your handling code here:
-    }//GEN-LAST:event_saveActionPerformed
+    }//GEN-LAST:event_saveButtonActionPerformed
+
+    private void exitActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_exitActionPerformed
+        // TODO add your handling code here:
+        System.exit(0);
+    }//GEN-LAST:event_exitActionPerformed
+
+    private void helpButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_helpButtonActionPerformed
+        // TODO add your handling code here:
+        try {
+            InputStream ins = Isizulu_Spellchecker.class.getResourceAsStream("resources/Instructions.txt");
+            BufferedReader insReader = new BufferedReader(new InputStreamReader(ins));
+            textarea.read(insReader, ins);
+            helpWindow.setVisible(true);
+
+        } catch (IOException ex) {
+            Logger.getLogger(Spellchecker.class.getName()).log(Level.SEVERE, null, ex);
+            System.out.println("File not found");
+        }
+    }//GEN-LAST:event_helpButtonActionPerformed
+
+    private void textPaneKeyTyped(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_textPaneKeyTyped
+        // TODO add your handling code here:
+        int len = textPane.getText().length();
+        /*StyledDocument doc = textPane.getStyledDocument();
+        Style defaultStyle = StyleContext.getDefaultStyleContext().
+                getStyle(StyleContext.DEFAULT_STYLE);
+        doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);*/
+        if (highlightSet && len != 0) {
+            if (language) {
+                instruction.setText("Click run to check the correctness of your changes or to continue to next error");
+            } else {
+                instruction.setText("Cofa usebenzisa ukuze uhlole ubunjalo kwezinguquko ozenzile noma udlulele ephutheni elilandelayo ");
+            }
+            instruction.setForeground(Color.blue);
+            highlightSet = false;
+        } else if (len == 0) {
+            if (language) {
+                instruction.setText("Type or paste text below or Click File -> Open file... to load a file!");
+            } else {
+                instruction.setText("Bhala noma namathelisela umbhalo olapha ngezansi noma > Cofa kuFayili > Vula ifayela...ukuze ufake ifayela.");
+            }
+            instruction.setForeground(Color.blue);
+            if (highlightSet) {
+                highlightSet = false;
+            }
+        } else {
+            if (language) {
+                instruction.setText("Click run to check for errors");
+            } else {
+                instruction.setText("Cofa uSebenzisa ukuze uhlole amaphutha");
+            }
+            instruction.setForeground(Color.blue);
+
+        }
+    }//GEN-LAST:event_textPaneKeyTyped
+
+    private class PopupListener extends MouseAdapter {
+
+        public void mousePressed(MouseEvent e) {
+            showPopup(e);
+        }
+
+        public void mouseReleased(MouseEvent e) {
+            showPopup(e);
+        }
+
+        private void showPopup(MouseEvent e) {
+            if (e.isPopupTrigger()) {
+                popup.show(e.getComponent(),
+                        e.getX(), e.getY());
+            }
+        }
+    }
 
     /**
      * @param args the command line arguments
@@ -359,9 +487,9 @@ public class Gui extends javax.swing.JFrame {
     private javax.swing.JButton add;
     private javax.swing.JButton change;
     private javax.swing.JButton changeAll;
-    private javax.swing.JButton clear;
+    private javax.swing.JButton clearButton;
     private javax.swing.JMenuItem contentsMenuItem;
-    private javax.swing.JButton copy;
+    private javax.swing.JButton copyButton;
     private javax.swing.JMenuItem copyMenuItem;
     private javax.swing.JMenuItem cutMenuItem;
     private javax.swing.JMenuItem deleteMenuItem;
@@ -369,28 +497,33 @@ public class Gui extends javax.swing.JFrame {
     private javax.swing.JButton exit;
     private javax.swing.JMenuItem exitMenuItem;
     private javax.swing.JMenu fileMenu;
-    private javax.swing.JButton help;
+    private javax.swing.JButton helpButton;
     private javax.swing.JMenu helpMenu;
     private javax.swing.JButton ignoreAll;
     private javax.swing.JButton ignoreOnce;
+    private javax.swing.JLabel instruction;
     private javax.swing.JButton jButton1;
-    private javax.swing.JLabel jLabel1;
-    private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
-    private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
-    private javax.swing.JTextPane jTextPane1;
+    private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JLabel logo;
     private javax.swing.JMenuBar menuBar;
     private javax.swing.JMenuItem openMenuItem;
-    private javax.swing.JButton paste;
+    private javax.swing.JButton pasteButton;
     private javax.swing.JMenuItem pasteMenuItem;
-    private javax.swing.JButton run;
-    private javax.swing.JButton save;
+    private javax.swing.JPopupMenu popup;
+    private javax.swing.JButton runButton;
     private javax.swing.JMenuItem saveAsMenuItem;
+    private javax.swing.JButton saveButton;
     private javax.swing.JMenuItem saveMenuItem;
-    private javax.swing.JButton step;
-    private javax.swing.JTextArea textarea;
+    private javax.swing.JButton stepButton;
+    private javax.swing.JLabel suggestionsLabel;
+    private javax.swing.JTextPane suggestionsPanel;
+    private javax.swing.JTextPane textPane;
     // End of variables declaration//GEN-END:variables
 
+    //Help window
+    private final javax.swing.JFrame helpWindow;
+    private final JPanel helpPanel;
+    private final JTextArea textarea;
 }

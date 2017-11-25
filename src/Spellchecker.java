@@ -1407,7 +1407,7 @@ public class Spellchecker extends javax.swing.JFrame {
         String[] sentences = textPane.getText().split("\n");
         String[] words;
         int sentence = 0;
-
+        
         if (sentences.length < 2) {
             words = textPane.getText().split(" ");
             //iterate through words

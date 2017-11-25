@@ -8,7 +8,8 @@ public class Isizulu_Spellchecker {
 
     public static void main(String[] args){
         
-        Spellchecker.main(args);
+        //Spellchecker.main(args);
+        Gui.main(args);
     }
 
 }
