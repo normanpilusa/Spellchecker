@@ -22,21 +22,33 @@ public class ErrorCorrector {
     static ArrayList<String> suggestions;
     static boolean alt;
 
-    public void initCorrector() {
+    public void initCorrector(String language) {
         try {
             //create HashMap for Trigrams and arraylist for iterating through
             hashTri = new HashMap<String, Integer>();
-            Probabilities prob = new Probabilities();
+            Probabilities prob = new Probabilities(language);
             hashAlt = prob.getProbMap();
             triArray = new ArrayList<String>();
-            File out = new File("corrected.txt");
+            File out;
+
+            InputStream probs, words;
+
+            //Set the language to be used by the corrector
+            if (language.equalsIgnoreCase("isixhosa")) {
+                probs = Isizulu_Spellchecker.class.getResourceAsStream("text/xhosaTrigrams.txt");
+                words = Isizulu_Spellchecker.class.getResourceAsStream("text/xhosaWordlist.txt");
+                out = new File("xhosaCorrected.txt");
+            } else {
+                probs = Isizulu_Spellchecker.class.getResourceAsStream("text/zuluTrigrams.txt");
+                words = Isizulu_Spellchecker.class.getResourceAsStream("text/zuluWordlist.txt");
+                out = new File("zuluCorrected.txt");
+            }
 
             if (!out.exists()) {
                 out.createNewFile();
             }
             BufferedWriter bw = new BufferedWriter(new FileWriter(out, true));
 
-            InputStream probs = Isizulu_Spellchecker.class.getResourceAsStream("text/trigrams2.txt");
             BufferedReader probsReader = new BufferedReader(new InputStreamReader(probs));
             //Load the wordlist
             String inputline = probsReader.readLine();
@@ -56,12 +68,11 @@ public class ErrorCorrector {
 
             //create hashset for wordlist
             wordlist = new HashSet<String>();
-            
-            InputStream words = Isizulu_Spellchecker.class.getResourceAsStream("text/wordlist.txt");
+
             BufferedReader wordReader = new BufferedReader(new InputStreamReader(words));
             //Load the wordlist
             String wordsline = wordReader.readLine();
-            
+
             //sc = new Scanner(new FileInputStream(new File("wordlist.txt")));
             while (wordsline != null) {
                 wordlist.add(wordsline.trim());
@@ -458,8 +469,7 @@ public class ErrorCorrector {
             }
         }
         /**
-         * for(String s: tempArr) { System.out.println(s);
-		}
+         * for(String s: tempArr) { System.out.println(s); }
          */
         return wordSugg;
     }

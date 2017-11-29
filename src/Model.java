@@ -31,10 +31,12 @@ public class Model extends ErrorCorrector{
     private final HashSet<String> wordlist = new HashSet<>();
     public final HashSet<String> dictionary = new HashSet<>(); //Stores words added by the user
     private String dictDatabas = ""; //to make writing back to file easier
-
-    public Model() {
+    private String language;
+    
+    public Model(String language) {
+        this.language = language;
         initialize();
-        initCorrector();
+        initCorrector(language);
     }
     /*
      * Checks word in wordlist before doing error detection
@@ -111,13 +113,27 @@ public class Model extends ErrorCorrector{
      */
     private void initialize() {
         try {
-            InputStream wdlist = Isizulu_Spellchecker.class.getResourceAsStream("resources/wordlist2.txt");
-            InputStream tri = Isizulu_Spellchecker.class.getResourceAsStream("resources/trigrams2.txt");
+            InputStream wdlist;
+            InputStream tri;
+            File dict;
+            
+            if (language.equalsIgnoreCase("isixhosa")){
+                wdlist = Isizulu_Spellchecker.class.getResourceAsStream("resources/xhosaWordlist.txt");
+                tri = Isizulu_Spellchecker.class.getResourceAsStream("resources/xhosaTrigrams.txt");
+                dict = new File("user_xhosa_dictionary");
+                
+            }else{
+                
+                wdlist = Isizulu_Spellchecker.class.getResourceAsStream("resources/zuluWordlist.txt");
+                tri = Isizulu_Spellchecker.class.getResourceAsStream("resources/zuluTrigrams.txt");
+                dict = new File("user_zulu_dictionary");
+            }
+            
 
             BufferedReader wdReader = new BufferedReader(new InputStreamReader(wdlist));
             BufferedReader trigramReader = new BufferedReader(new InputStreamReader(tri));
 
-            File dict = new File("user_dictionary");
+            
 
             // Load user dictionary if it exists
             String line;
@@ -178,7 +194,14 @@ public class Model extends ErrorCorrector{
 
         try {
             //updates the content of the user dictionary*/
-            File dict = new File("user_dictionary");
+            File dict;
+            if (language.equalsIgnoreCase("isixhosa")){
+                dict = new File("user_xhosa_dictionary");
+            }
+            else{
+                dict = new File("user_zulu_dictionary");
+            }
+            
             if (!dict.exists()) {
                 dict.createNewFile();
                 fw = new FileWriter(dict);

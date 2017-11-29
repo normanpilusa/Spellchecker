@@ -77,7 +77,7 @@ public class Spellchecker extends javax.swing.JFrame {
      * Creates new form Spell checker
      */
     public Spellchecker() {
-        m = new Model();
+        m = new Model("isiZulu");
         initComponents();
         FileFilter docFilter = new MyCustomFilter(".docx", "Microsoft Word Documents");
         FileFilter txtFilter = new MyCustomFilter(".txt", "Text Documents");

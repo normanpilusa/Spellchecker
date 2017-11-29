@@ -23,7 +23,7 @@ public class AccuracyTest {
         // TODO Auto-generated method stub
         HashSet<String> dictionary = new HashSet<>();
         try {
-            Model m = new Model();
+            Model m = new Model("language");
             double correct = 0;
             double incorrect = 0;
             InputStream wdlist = Isizulu_Spellchecker.class
