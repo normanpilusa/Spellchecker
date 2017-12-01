@@ -1,9 +1,13 @@
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Point;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -12,25 +16,30 @@ import java.util.Collections;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.BorderFactory;
+import javax.swing.JEditorPane;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
+import javax.swing.SwingUtilities;
+import javax.swing.filechooser.FileFilter;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultEditorKit;
 import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.Element;
 import javax.swing.text.Highlighter;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
 import javax.swing.text.StyledDocument;
+import javax.swing.text.Utilities;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-
 /**
  *
  * @author npilusa
@@ -38,28 +47,30 @@ import javax.swing.text.StyledDocument;
 public class GUI2 extends javax.swing.JFrame {
 
     Model m;
-    Model xhosa;
     String text;
     String currentWord = "";
     String correction = "";
     boolean language = true;
-
+    private File openedFile = null;
+    private final String[] NOSUGGESTION = {"No suggestion"};
+    Style defaultStyle = StyleContext.getDefaultStyleContext().
+            getStyle(StyleContext.DEFAULT_STYLE);
     //Markers
     int sentNo = 0;//Which sentence
     int wordNo = 0;//Which word in a sentence
-    int pos = 0; //The word position in the text area
+
+    int position = 0; //The word position in the text area
     boolean endOfText = false;
     boolean highlightSet = false; //Used to clear text area
 
     Highlighter.HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.YELLOW);
-    ArrayList<String> once = new ArrayList<>(); //Ignored once
     ArrayList<String> all = new ArrayList<>(); //Ignored all
-    
+
     /**
      * Creates new form GUI2
      */
     public GUI2() {
-        m = new Model("isizulu");
+        m = new Model("isixhosa"); //Default model used
 
         //Initiaze commponents
         style = StyleContext.getDefaultStyleContext();
@@ -69,6 +80,12 @@ public class GUI2 extends javax.swing.JFrame {
         fore_black = style.addAttribute(style.getEmptySet(), StyleConstants.Foreground, Color.BLACK);
 
         initComponents();
+        FileFilter docFilter = new MyCustomFilter(".docx", "Microsoft Word Documents");
+        FileFilter txtFilter = new MyCustomFilter(".txt", "Text Documents");
+
+        fileChooser.addChoosableFileFilter(docFilter);
+        fileChooser.addChoosableFileFilter(txtFilter);
+
         copyButton.addActionListener(new DefaultEditorKit.CopyAction());
         pasteButton.addActionListener(new DefaultEditorKit.PasteAction());
 
@@ -110,6 +127,7 @@ public class GUI2 extends javax.swing.JFrame {
     private void initComponents() {
 
         popup = new javax.swing.JPopupMenu();
+        fileChooser = new javax.swing.JFileChooser();
         jScrollPane1 = new javax.swing.JScrollPane();
         textPane = new javax.swing.JTextPane();
         change = new javax.swing.JButton();
@@ -117,7 +135,6 @@ public class GUI2 extends javax.swing.JFrame {
         exit = new javax.swing.JButton();
         ignoreOnce = new javax.swing.JButton();
         runButton = new javax.swing.JButton();
-        stepButton = new javax.swing.JButton();
         saveButton = new javax.swing.JButton();
         copyButton = new javax.swing.JButton();
         pasteButton = new javax.swing.JButton();
@@ -146,16 +163,31 @@ public class GUI2 extends javax.swing.JFrame {
         contentsMenuItem = new javax.swing.JMenuItem();
         aboutMenuItem = new javax.swing.JMenuItem();
 
+        fileChooser.setDialogTitle("Select file");
+
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
+        textPane.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                textPaneMouseClicked(evt);
+            }
+        });
         textPane.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyTyped(java.awt.event.KeyEvent evt) {
                 textPaneKeyTyped(evt);
+            }
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                textPaneKeyReleased(evt);
             }
         });
         jScrollPane1.setViewportView(textPane);
 
         change.setText("Change");
+        change.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                changeActionPerformed(evt);
+            }
+        });
 
         ignoreAll.setText("Ignore all");
         ignoreAll.addActionListener(new java.awt.event.ActionListener() {
@@ -185,13 +217,6 @@ public class GUI2 extends javax.swing.JFrame {
             }
         });
 
-        stepButton.setText("Step");
-        stepButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                stepButtonActionPerformed(evt);
-            }
-        });
-
         saveButton.setText("Save");
         saveButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -202,6 +227,11 @@ public class GUI2 extends javax.swing.JFrame {
         copyButton.setText("Copy");
 
         pasteButton.setText("Paste");
+        pasteButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                pasteButtonActionPerformed(evt);
+            }
+        });
 
         clearButton.setText("Clear");
         clearButton.addActionListener(new java.awt.event.ActionListener() {
@@ -227,11 +257,16 @@ public class GUI2 extends javax.swing.JFrame {
         jLabel1.setText("Suggestions");
 
         changeAll.setText("Change all");
+        changeAll.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                changeAllActionPerformed(evt);
+            }
+        });
 
         logo.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/logo.png"))); // NOI18N
 
         suggestedWords.setModel(new javax.swing.AbstractListModel<String>() {
-            String[] strings = { "Item 1", "Item 2", "Item 3", "Item 4", "Item 5" };
+            String[] strings = { "No suggestions" };
             public int getSize() { return strings.length; }
             public String getElementAt(int i) { return strings[i]; }
         });
@@ -244,7 +279,7 @@ public class GUI2 extends javax.swing.JFrame {
 
         instruction.setText("This right here will be the instruction given to the user of the spellchecker as a guide.");
 
-        languageDropdown.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "isiZulu", "isiXhosa" }));
+        languageDropdown.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "isiXhosa", "isiZulu" }));
         languageDropdown.addItemListener(new java.awt.event.ItemListener() {
             public void itemStateChanged(java.awt.event.ItemEvent evt) {
                 languageDropdownItemStateChanged(evt);
@@ -256,15 +291,30 @@ public class GUI2 extends javax.swing.JFrame {
 
         openMenuItem.setMnemonic('o');
         openMenuItem.setText("Open");
+        openMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                openMenuItemActionPerformed(evt);
+            }
+        });
         fileMenu.add(openMenuItem);
 
         saveMenuItem.setMnemonic('s');
         saveMenuItem.setText("Save");
+        saveMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveMenuItemActionPerformed(evt);
+            }
+        });
         fileMenu.add(saveMenuItem);
 
         saveAsMenuItem.setMnemonic('a');
         saveAsMenuItem.setText("Save As ...");
         saveAsMenuItem.setDisplayedMnemonicIndex(5);
+        saveAsMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveAsMenuItemActionPerformed(evt);
+            }
+        });
         fileMenu.add(saveAsMenuItem);
 
         exitMenuItem.setMnemonic('x');
@@ -327,8 +377,6 @@ public class GUI2 extends javax.swing.JFrame {
                             .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
                                 .addComponent(runButton, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(stepButton, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(saveButton, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(copyButton, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -338,7 +386,7 @@ public class GUI2 extends javax.swing.JFrame {
                                 .addComponent(clearButton, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(helpButton, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(18, 18, 18)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(languageDropdown, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addGap(0, 0, Short.MAX_VALUE))
                             .addComponent(jScrollPane1, javax.swing.GroupLayout.Alignment.LEADING))
@@ -365,7 +413,7 @@ public class GUI2 extends javax.swing.JFrame {
 
         layout.linkSize(javax.swing.SwingConstants.HORIZONTAL, new java.awt.Component[] {add, change, changeAll, ignoreAll, ignoreOnce});
 
-        layout.linkSize(javax.swing.SwingConstants.HORIZONTAL, new java.awt.Component[] {clearButton, copyButton, exit, helpButton, pasteButton, runButton, saveButton, stepButton});
+        layout.linkSize(javax.swing.SwingConstants.HORIZONTAL, new java.awt.Component[] {clearButton, copyButton, exit, helpButton, pasteButton, runButton, saveButton});
 
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -375,7 +423,6 @@ public class GUI2 extends javax.swing.JFrame {
                         .addGap(18, 18, 18)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(runButton)
-                            .addComponent(stepButton)
                             .addComponent(saveButton)
                             .addComponent(copyButton)
                             .addComponent(pasteButton)
@@ -408,7 +455,7 @@ public class GUI2 extends javax.swing.JFrame {
                 .addGap(20, 20, 20))
         );
 
-        layout.linkSize(javax.swing.SwingConstants.VERTICAL, new java.awt.Component[] {add, change, changeAll, clearButton, copyButton, exit, helpButton, ignoreAll, ignoreOnce, languageDropdown, pasteButton, runButton, saveButton, stepButton});
+        layout.linkSize(javax.swing.SwingConstants.VERTICAL, new java.awt.Component[] {add, change, changeAll, clearButton, copyButton, exit, helpButton, ignoreAll, ignoreOnce, languageDropdown, pasteButton, runButton, saveButton});
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
@@ -421,104 +468,8 @@ public class GUI2 extends javax.swing.JFrame {
         // TODO add your handling code here:
         text = textPane.getText();
         StyledDocument doc = textPane.getStyledDocument();
-        Style defaultStyle = StyleContext.getDefaultStyleContext().
-                getStyle(StyleContext.DEFAULT_STYLE);
-        doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
-        String[] sentences = text.split("\n");
-        String[] words;
-        int start = 0;
-        int end = 0;
-        boolean active = true;
+        doc.setCharacterAttributes(position, currentWord.length(), defaultStyle, true);
 
-        if (text.length() == 0) {
-            if (language) {
-                instruction.setText("Type or paste text below or Click File -> Open file... to load a file!");
-            } else {
-                instruction.setText("Bhala noma namathelisela umbhalo olapha ngezansi noma > Cofa kuFayili > Vula ifayela...ukuze ufake ifayela.");
-            }
-            instruction.setForeground(Color.red);
-            return;
-        } else if (!highlightSet) {
-            if (language) {
-                instruction.setText("Click Run first!");
-            } else {
-                instruction.setText("Cofa uSebenzisa kuqala!");
-            }
-            instruction.setForeground(Color.red);
-            return;
-        } else if (pos >= text.length()) {
-            if (language) {
-                instruction.setText("You reached the end of your text. Click run to check again");
-            } else {
-                instruction.setText("Usufike esiphethweni sombhalo wakho. Cofa usebenzisa ukuze uhlole futhi");
-            }
-            instruction.setForeground(Color.BLUE);
-            return;
-        } else {
-            once.add(currentWord);
-        }
-
-        //Input is just a sentence or word
-        if (sentences.length < 2) {
-            words = text.split(" ");
-
-            //iterate through words
-            for (int i = wordNo; i < words.length; i++) {
-                String word = words[i];
-                if (!all.contains(word) && !m.check(word)) {//incorrect word
-                    start = text.indexOf(word, pos);
-                    end = start + word.length();
-                    doc.setCharacterAttributes(start, word.length(), fore_red, true);
-                    currentWord = text.substring(start, end);
-                    pos += word.length() + 1; //move to next word then stop
-                    wordNo += 1;
-                    break;
-                }
-                wordNo += 1;
-                pos += word.length() + 1;
-            }
-
-            //Input is a two or more lines
-        } else {
-            while (sentNo < sentences.length && active) {
-                words = sentences[sentNo].split(" ");
-                //iterate through words
-                for (int i = wordNo; i < words.length; i++) {
-                    String word = words[i];
-                    if (!all.contains(word) && !m.check(word)) {
-                        start = text.indexOf(word, pos);
-                        end = start + word.length();
-                        doc.setCharacterAttributes(start, word.length(), fore_red, true);
-                        currentWord = text.substring(start, end);
-                        pos += word.length() + 1; //move to next word then stop
-                        wordNo += 1;
-                        active = false;
-                        break;
-                    }
-                    wordNo += 1;
-                    pos += word.length() + 1;
-
-                }
-
-                //Jump to next sentence
-                if (wordNo >= words.length) {
-                    wordNo = 0;
-                    sentNo++;
-                }
-            }
-
-        }
-        if (pos >= text.length() && sentNo >= sentences.length) {
-            if (language) {
-                instruction.setText("You reached the end of your text. Click run to check again");
-            } else {
-                instruction.setText("Usufike esiphethweni sombhalo wakho. Cofa usebenzisa ukuze uhlole futhi");
-            }
-            instruction.setForeground(Color.BLUE);
-            currentWord = "";
-            return;
-        }
-        highlightSet = true;
     }//GEN-LAST:event_ignoreOnceActionPerformed
 
     private void exitActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_exitActionPerformed
@@ -534,7 +485,12 @@ public class GUI2 extends javax.swing.JFrame {
             StyledDocument doc = textPane.getStyledDocument();
             try {
                 //Adds test to main text pane. This is incorrect
-                doc.insertString(0, suggestedWords.getSelectedValue().toString(), fore_blue);
+                doc.remove(position, currentWord.length());
+                doc.insertString(position, suggestedWords.getSelectedValue().toString(), fore_black);
+
+                //Change replacment to default style 
+                doc.setCharacterAttributes(position, suggestedWords.getSelectedValue().toString().length(), defaultStyle, true);
+
             } catch (Exception e) {
                 System.out.println(e);
             }
@@ -542,7 +498,19 @@ public class GUI2 extends javax.swing.JFrame {
     }//GEN-LAST:event_suggestedWordsMouseClicked
 
     private void clearButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearButtonActionPerformed
-        // TODO add your handling code here:
+
+        //Clear error highlights
+        StyledDocument doc = textPane.getStyledDocument();
+        Style defaultStyle = StyleContext.getDefaultStyleContext().
+                getStyle(StyleContext.DEFAULT_STYLE);
+        doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
+
+        //Remove text from textPane
+        textPane.setText("");
+        
+        //Remove previous suggestions
+        suggestedWords.setListData(NOSUGGESTION);
+
         if (textPane.getText().length() == 0) {
             if (language) {
                 instruction.setText("Nothing to clear");
@@ -557,16 +525,13 @@ public class GUI2 extends javax.swing.JFrame {
                 instruction.setText("Umbhalo usucishiwe! Qala kabusha.");
             }
             instruction.setForeground(Color.BLUE);
-            pos = 0;
-            sentNo = 0;
-            wordNo = 0;
-            textPane.setText("");
         }
     }//GEN-LAST:event_clearButtonActionPerformed
 
     private void runButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runButtonActionPerformed
         // TODO add your handling code here:
-         text = textPane.getText();
+        text = textPane.getText();
+
         if (text.length() == 0) {
             if (language) {
                 instruction.setText("Type or paste text below or Click File -> Open file... to load a file!");
@@ -610,6 +575,7 @@ public class GUI2 extends javax.swing.JFrame {
                     //end = start + word.length();
                     StyledDocument doc = textPane.getStyledDocument();
                     doc.setCharacterAttributes(start, word.length(), fore_red, true);
+
                 }
                 position += word.length() + 1;
             }
@@ -632,10 +598,6 @@ public class GUI2 extends javax.swing.JFrame {
 
         }
         highlightSet = true;
-        //Resets globals used by other buttons such as ignoreAll
-        pos = 0;
-        sentNo = 0;
-        wordNo = 0;
     }//GEN-LAST:event_runButtonActionPerformed
 
     private void ignoreAllActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_ignoreAllActionPerformed
@@ -643,108 +605,11 @@ public class GUI2 extends javax.swing.JFrame {
         text = textPane.getText();
         StyledDocument doc = textPane.getStyledDocument();
         Style defaultStyle = StyleContext.getDefaultStyleContext().
-        getStyle(StyleContext.DEFAULT_STYLE);
+                getStyle(StyleContext.DEFAULT_STYLE);
         doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
-        String[] sentences = text.split("\n");
-        String[] words;
-        int start = 0;
-        int end = 0;
-        boolean active = true;
 
-        if (text.length() == 0) {
-            if (language) {
-                instruction.setText("Type or paste text below or Click File -> Open file... to load a file!");
-            } else {
-                instruction.setText("Bhala noma namathelisela umbhalo olapha ngezansi noma > Cofa kuFayili > Vula ifayela...ukuze ufake ifayela.");
-            }
-            instruction.setForeground(Color.red);
-            return;
-        } else if (!highlightSet) {
-            if (language) {
-                instruction.setText("Click Run first!");
-            } else {
-                instruction.setText("Cofa uSebenzisa kuqala!");
-            }
-            instruction.setForeground(Color.red);
-            return;
-        } else if (pos >= text.length()) {
-            if (language) {
-                instruction.setText("You reached the end of your text. Click run to check again");
-            } else {
-                instruction.setText("Usufike esiphethweni sombhalo wakho. Cofa usebenzisa ukuze uhlole futhi");
-            }
-            instruction.setForeground(Color.BLUE);
-            if (highlightSet) {
-                if (!all.contains(currentWord)) {
-                    all.add(currentWord);
-                }
-                highlightSet = false;
-            }
-            return;
-        } else {
-            all.add(currentWord);
-        }
-
-        //Input is just a sentence or word
-        if (sentences.length < 2) {
-            words = text.split(" ");
-
-            //iterate through words
-            for (int i = wordNo; i < words.length; i++) {
-                String word = words[i];
-                if (!all.contains(word) && !m.check(word)) {//incorrect word
-                    start = text.indexOf(word, pos);
-                    end = start + word.length();
-                    /// doc.setCharacterAttributes(start, word.length(), fore_red, true);
-                    currentWord = text.substring(start, end);
-                    pos += word.length() + 1; //move to next word then stop
-                    wordNo += 1;
-                    break;
-                }
-                wordNo += 1;
-                pos += word.length() + 1;
-            }
-
-            //Input is a two or more lines
-        } else {
-            while (sentNo < sentences.length && active) {
-                words = sentences[sentNo].split(" ");
-                //iterate through words
-                for (int i = wordNo; i < words.length; i++) {
-                    String word = words[i];
-                    if (!all.contains(word) && !m.check(word)) {
-                        start = text.indexOf(word, pos);
-                        end = start + word.length();
-                        /// doc.setCharacterAttributes(start, word.length(), fore_red, true);
-                        currentWord = text.substring(start, end);
-                        pos += word.length() + 1; //move to next word then stop
-                        wordNo += 1;
-                        active = false;
-                        break;
-                    }
-                    wordNo += 1;
-                    pos += word.length() + 1;
-                }
-
-                //Jump to next sentence
-                if (wordNo >= words.length) {
-                    wordNo = 0;
-                    sentNo++;
-                }
-            }
-
-        }
-        if (pos >= text.length() && sentNo >= sentences.length) {
-            if (language) {
-                instruction.setText("You reached the end of your text. Click run to check again");
-            } else {
-                instruction.setText("Usufike esiphethweni sombhalo wakho. Cofa usebenzisa ukuze uhlole futhi");
-            }
-            instruction.setForeground(Color.BLUE);
-            currentWord = "";
-            return;
-        }
-        highlightSet = true;
+        //Add to dictionary of ignore all occurrances of the word
+        all.add(currentWord);
     }//GEN-LAST:event_ignoreAllActionPerformed
 
     private void helpButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_helpButtonActionPerformed
@@ -763,11 +628,8 @@ public class GUI2 extends javax.swing.JFrame {
 
     private void textPaneKeyTyped(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_textPaneKeyTyped
         // TODO add your handling code here:
+
         int len = textPane.getText().length();
-        /*StyledDocument doc = textPane.getStyledDocument();
-        Style defaultStyle = StyleContext.getDefaultStyleContext().
-        getStyle(StyleContext.DEFAULT_STYLE);
-        doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);*/
         if (highlightSet && len != 0) {
             if (language) {
                 instruction.setText("Click run to check the correctness of your changes or to continue to next error");
@@ -797,240 +659,243 @@ public class GUI2 extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_textPaneKeyTyped
 
-    private void stepButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_stepButtonActionPerformed
-        // TODO add your handling code here:
-        StyledDocument doc = textPane.getStyledDocument();
-        Style defaultStyle = StyleContext.getDefaultStyleContext().
-        getStyle(StyleContext.DEFAULT_STYLE);
-        doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
-        try {
-            text = doc.getText(0, doc.getLength());
-        } catch (BadLocationException e) {
-            e.printStackTrace();
-        }
-        if (text.length() == 0) {
-            if (language) {
-                instruction.setText("Type or paste text below or Click File -> Open file... to load a file!");
-            } else {
-                instruction.setText("Bhala noma namathelisela umbhalo olapha ngezansi noma > Cofa kuFayili > Vula ifayela...ukuze ufake ifayela.");
-            }
-            instruction.setForeground(Color.red);
-            return;
-        } else if (noErrors()) {
-            if (language) {
-                instruction.setText("No immediate errors detected!");
-            } else {
-                instruction.setText("Akukho maphutha atholakele");
-            }
-            instruction.setForeground(Color.BLUE);
-            return;
-        } else {
-            if (language) {
-                instruction.setText("Double click on a suggested word to replace incorrect.");
-            } else {
-                instruction.setText("Ufuna ukwenzani ngaleli phutha?");
-            }
-            instruction.setForeground(Color.BLUE);
-            pos = 0;
-            wordNo = 0;
-            sentNo = 0;
-
-        }
-
-        String[] sentences = text.split("\n");
-        String[] words;
-        int start = 0;
-        int end = 0;
-        boolean active = true;
-
-        //Input is just a sentence or word
-        if (sentences.length < 2) {
-            words = text.split(" ");
-
-            //iterate through words
-            for (int i = wordNo; i < words.length; i++) {
-                String word = words[i];
-                if (!all.contains(word) && !m.check(word)) {//incorrect word
-
-                    //Get suggestions and add them to the suggestions list
-                    ArrayList<String> suggestions = m.correct(word);
-                    addSugg(suggestions);
-
-                    start = text.indexOf(word, pos);
-                    end = start + word.length();
-                    doc.setCharacterAttributes(start, word.length(), fore_red, true);
-                    currentWord = text.substring(start, end);
-                    pos += word.length() + 1; //move to next word then stop
-                    wordNo += 1;
-                    break;
-                }
-                wordNo += 1;
-                pos += word.length() + 1;
-            }
-
-            //Input is a two or more lines
-        } else {
-            while (sentNo < sentences.length && active) {
-                words = sentences[sentNo].split(" ");
-                //iterate through words
-                for (int i = wordNo; i < words.length; i++) {
-                    String word = words[i];
-                    if (!all.contains(word) && !m.check(word)) { //incorrect word
-
-                        //Get suggestions and add them to the suggestions list
-                        ArrayList<String> suggestions = m.correct(word);
-                        addSugg(suggestions);
-
-                        start = text.indexOf(word, pos);
-                        end = start + word.length();
-
-                        start = text.indexOf(word, pos);
-                        end = start + word.length();
-                        doc.setCharacterAttributes(start, word.length(), fore_red, true);
-                        currentWord = text.substring(start, end);
-                        pos += word.length() + 1; //move to next word then stop
-                        wordNo += 1;
-                        active = false;
-                        break;
-                    }
-                    wordNo += 1;
-                    pos += word.length() + 1;
-                }
-
-                //Jump to next sentence
-                if (wordNo >= words.length) {
-                    wordNo = 0;
-                    sentNo++;
-                }
-            }
-
-        }
-        highlightSet = true;
-    }//GEN-LAST:event_stepButtonActionPerformed
-
     private void addActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addActionPerformed
         // TODO add your handling code here:
         text = textPane.getText();
         StyledDocument doc = textPane.getStyledDocument();
         Style defaultStyle = StyleContext.getDefaultStyleContext().
-        getStyle(StyleContext.DEFAULT_STYLE);
+                getStyle(StyleContext.DEFAULT_STYLE);
         doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
-        String[] sentences = text.split("\n");
-        String[] words;
-        int start = 0;
-        int end = 0;
-        boolean active = true;
 
-        if (text.length() == 0) {
-            if (language) {
-                instruction.setText("Type or paste text below or Click File -> Open file... to load a file!");
-            } else {
-                instruction.setText("Bhala noma namathelisela umbhalo olapha ngezansi noma > Cofa kuFayili > Vula ifayela...ukuze ufake ifayela.");
-            }
-            instruction.setForeground(Color.red);
-            return;
-        } else if (!highlightSet) {
-            if (language) {
-                instruction.setText("Click Run first!");
-            } else {
-                instruction.setText("Cofa uSebenzisa kuqala!");
-            }
-            instruction.setForeground(Color.red);
-            return;
-        } else if (pos >= text.length()) {
-            if (language) {
-                instruction.setText("You reached the end of your text. Click run to check again");
-            } else {
-                instruction.setText("Usufike esiphethweni sombhalo wakho. Cofa usebenzisa ukuze uhlole futhi");
-            }
-            instruction.setForeground(Color.BLUE);
-            if (highlightSet) {//one word text
+        //Add word to user dictionary
+        m.addWord(currentWord);
 
-                m.addWord(currentWord);
-                highlightSet = false;
-            }
-            return;
-        } else {
-            m.addWord(currentWord);//Writes the word to the user's dictionary
-        }
-
-        //Input is just a sentence or word
-        if (sentences.length < 2) {
-            words = text.split(" ");
-
-            //iterate through words
-            for (int i = wordNo; i < words.length; i++) {
-                String word = words[i];
-                if (!all.contains(word) && !m.check(word)) {//incorrect word
-                    start = text.indexOf(word, pos);
-                    end = start + word.length();
-                    doc.setCharacterAttributes(start, word.length(), fore_red, true);
-                    currentWord = text.substring(start, end);
-                    pos += word.length() + 1; //move to next word then stop
-                    wordNo += 1;
-                    break;
-                }
-                wordNo += 1;
-                pos += word.length() + 1;
-            }
-
-            //Input is a two or more lines
-        } else {
-            while (sentNo < sentences.length && active) {
-                words = sentences[sentNo].split(" ");
-                //iterate through words
-                for (int i = wordNo; i < words.length; i++) {
-                    String word = words[i];
-                    if (!all.contains(word) && !m.check(word)) {
-                        start = text.indexOf(word, pos);
-                        end = start + word.length();
-                        doc.setCharacterAttributes(start, word.length(), fore_red, true);
-                        currentWord = text.substring(start, end);
-                        pos += word.length() + 1; //move to next word then stop
-                        wordNo += 1;
-                        active = false;
-                        break;
-                    }
-                    wordNo += 1;
-                    pos += word.length() + 1;
-                }
-
-                //Jump to next sentence
-                if (wordNo >= words.length) {
-                    wordNo = 0;
-                    sentNo++;
-                }
-            }
-
-        }
-        if (pos >= text.length() && sentNo >= sentences.length) {
-            if (language) {
-                instruction.setText("You reached the end of your text. Click run to check again");
-            } else {
-                instruction.setText("Usufike esiphethweni sombhalo wakho. Cofa usebenzisa ukuze uhlole futhi");
-            }
-            instruction.setForeground(Color.BLUE);
-            currentWord = "";
-            return;
-        }
-        highlightSet = true;
     }//GEN-LAST:event_addActionPerformed
 
     private void saveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveButtonActionPerformed
         // TODO add your handling code here:
+        saveMenuItemActionPerformed(evt);
     }//GEN-LAST:event_saveButtonActionPerformed
 
     private void languageDropdownItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_languageDropdownItemStateChanged
-        // TODO add your handling code here:
-        System.out.println(languageDropdown.getModel().getSelectedItem());
+        // Change the langauge used by the model:
+        String lang = languageDropdown.getModel().getSelectedItem().toString();
+        m = new Model(lang);
+
+        //Clear error highlights
+        StyledDocument doc = textPane.getStyledDocument();
+        Style defaultStyle = StyleContext.getDefaultStyleContext().
+                getStyle(StyleContext.DEFAULT_STYLE);
+        doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
     }//GEN-LAST:event_languageDropdownItemStateChanged
+
+    private void openMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openMenuItemActionPerformed
+        // TODO add your handling code here:
+        fileChooser.setDialogTitle("Open file");
+        int returnVal = fileChooser.showOpenDialog(this);
+        if (language) {
+            instruction.setText("Click run to check for errors");
+        } else {
+            instruction.setText("Cofa uSebenzisa ukuze uhlole amaphutha");
+        }
+        instruction.setForeground(Color.BLUE);
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            openedFile = fileChooser.getSelectedFile();
+            String name = openedFile.getName();
+            String ext = name.substring(name.indexOf("."), name.length());
+
+            try {
+                // What to do with the file, e.g. display it in a TextArea
+                if (highlightSet) {
+                    StyledDocument doc = textPane.getStyledDocument();
+                    Style defaultStyle = StyleContext.getDefaultStyleContext().
+                            getStyle(StyleContext.DEFAULT_STYLE);
+                    doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
+                }
+                if (name.endsWith(".docx")) {
+                    /*FileInputStream fis = new FileInputStream(file.getAbsolutePath());
+                    XWPFDocument docx = new XWPFDocument(fis);
+                    List<XWPFParagraph> pars = docx.getParagraphs();
+                    String toDisplay = "";
+                    for (XWPFParagraph para : pars) {
+                        toDisplay += para.getText() + "\n";
+                    }
+
+                    textPane.setText(toDisplay);
+                    text = textPane.getText();
+                    docx.close();*/
+                } else {
+                    textPane.read(new FileReader(openedFile.getAbsolutePath()), null);
+                    text = textPane.getText(); //for controlling the displayed text
+                }
+            } catch (IOException ex) {
+                System.out.println("problem accessing file" + openedFile.getAbsolutePath());
+            }
+        }
+
+    }//GEN-LAST:event_openMenuItemActionPerformed
+
+    private void saveMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveMenuItemActionPerformed
+        // TODO add your handling code here:
+        fileChooser.setDialogTitle("Save file");
+        int returnVal = fileChooser.showSaveDialog(this);
+        if (openedFile == null) {
+            openedFile = fileChooser.getSelectedFile();
+        }
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            try {
+                // What to do with the file, e.g. display it in a TextArea
+                if (highlightSet) {
+                    StyledDocument doc = textPane.getStyledDocument();
+                    Style defaultStyle = StyleContext.getDefaultStyleContext().
+                            getStyle(StyleContext.DEFAULT_STYLE);
+                    doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
+                }
+                if (openedFile.getName().endsWith(".docx")) {
+                    /*XWPFDocument document = new XWPFDocument();
+                    XWPFParagraph tmpParagraph = document.createParagraph();
+                    XWPFRun tmpRun = tmpParagraph.createRun();
+                    tmpRun.setText(textPane.getText());
+                    tmpRun.setFontSize(12);
+                    document.write(new FileOutputStream(new File(file.getPath())));
+                    document.close();*/
+                } else {
+                    textPane.write(new FileWriter(openedFile.getAbsolutePath()));//this file has no extension
+                }
+            } catch (IOException ex) {
+                System.out.println("problem accessing file" + openedFile.getAbsolutePath());
+            }
+        }
+    }//GEN-LAST:event_saveMenuItemActionPerformed
+
+    private void saveAsMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveAsMenuItemActionPerformed
+        // TODO add your handling code here:
+        fileChooser.setDialogTitle("Save file as");
+        int returnVal = fileChooser.showSaveDialog(this);
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            File file = fileChooser.getSelectedFile();
+            try {
+                // What to do with the file, e.g. display it in a TextArea
+                if (highlightSet) {
+                    StyledDocument doc = textPane.getStyledDocument();
+                    Style defaultStyle = StyleContext.getDefaultStyleContext().
+                            getStyle(StyleContext.DEFAULT_STYLE);
+                    doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
+                }
+                if (file.getName().endsWith(".docx")) {
+                    /*XWPFDocument document = new XWPFDocument();
+                    XWPFParagraph tmpParagraph = document.createParagraph();
+                    XWPFRun tmpRun = tmpParagraph.createRun();
+                    tmpRun.setText(textPane.getText());
+                    tmpRun.setFontSize(12);
+                    document.write(new FileOutputStream(new File(file.getPath())));
+                    document.close();*/
+                } else {
+                    textPane.write(new FileWriter(file.getAbsolutePath()));//this file has no extension
+                }
+            } catch (IOException ex) {
+                System.out.println("problem accessing file" + file.getAbsolutePath());
+            }
+        }
+    }//GEN-LAST:event_saveAsMenuItemActionPerformed
+
+    private void pasteButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_pasteButtonActionPerformed
+        // TODO add your handling code here:
+        //Clear error highlights
+        StyledDocument doc = textPane.getStyledDocument();
+        doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
+
+    }//GEN-LAST:event_pasteButtonActionPerformed
+
+    private void textPaneMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_textPaneMouseClicked
+        try {
+            //Remove previous suggestions
+            suggestedWords.setListData(NOSUGGESTION);
+
+            if (evt.getClickCount() == 2) {//Double click a word to get suggestion
+                String wrd = null;
+                int pt = textPane.viewToModel(evt.getPoint());
+
+                int spt = Utilities.getWordStart(textPane, pt);
+                int ept = Utilities.getWordEnd(textPane, pt);
+                wrd = textPane.getText(spt, ept - spt);
+
+                if (wrd.length() > 0) {
+                    ArrayList<String> suggestions = m.correct(wrd);
+                    addSugg(suggestions);
+                }
+                currentWord = wrd;
+                position = spt;
+            }
+
+        } catch (BadLocationException ex) {
+            Logger.getLogger(GUI2.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }//GEN-LAST:event_textPaneMouseClicked
+
+    private void textPaneKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_textPaneKeyReleased
+        // TODO add your handling code here:
+        if (evt.isActionKey()) {
+            //Remove previous suggestions
+            suggestedWords.setListData(NOSUGGESTION);
+            return;
+        }
+
+        StyledDocument doc = textPane.getStyledDocument();
+        Style defaultStyle = StyleContext.getDefaultStyleContext().
+                getStyle(StyleContext.DEFAULT_STYLE);
+        doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
+    }//GEN-LAST:event_textPaneKeyReleased
+
+    private void changeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_changeActionPerformed
+        // TODO add your handling code here:
+        StyledDocument doc = textPane.getStyledDocument();
+        try {
+            //Adds test to main text pane. This is incorrect
+            doc.remove(position, currentWord.length());
+            doc.insertString(position, suggestedWords.getSelectedValue().toString(), fore_black);
+
+            //Change replacement to default style 
+            doc.setCharacterAttributes(position, suggestedWords.getSelectedValue().toString().length(), defaultStyle, true);
+
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+    }//GEN-LAST:event_changeActionPerformed
+
+    private void changeAllActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_changeAllActionPerformed
+        // TODO add your handling code here:
+        StyledDocument doc = textPane.getStyledDocument();
+        int index = textPane.getText().indexOf(currentWord);
+        try {
+            //Find all occurances
+            while (index != -1) {
+                
+                //Remove occurance and insert suggested word
+                doc.remove(index, currentWord.length());
+                doc.insertString(index, suggestedWords.getSelectedValue().toString(), fore_black);
+
+                //Change replacment to default style 
+                doc.setCharacterAttributes(index, suggestedWords.getSelectedValue().toString().length(), defaultStyle, true);
+                
+                //Find next occurance
+                index = textPane.getText().indexOf(currentWord);
+                doc = textPane.getStyledDocument();
+            }
+            
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+
+
+    }//GEN-LAST:event_changeAllActionPerformed
 
     public void addSugg(ArrayList<String> arr) {
         Collections.sort(arr, Collections.reverseOrder());
         String suggestions[] = new String[arr.size()];
 
         if (arr.size() == 0) {
-            suggestions[0] = "No Suggestions";
+            suggestions = NOSUGGESTION;
         } else {
             for (int i = 0; i < arr.size(); i++) {
                 if (i == 10) {
@@ -1044,8 +909,8 @@ public class GUI2 extends javax.swing.JFrame {
         suggestedWords.setListData(suggestions);
 
     }
-    
-     /**
+
+    /**
      * Checks for all errors
      */
     private boolean noErrors() {
@@ -1097,7 +962,7 @@ public class GUI2 extends javax.swing.JFrame {
             }
         }
     }
-    
+
     /**
      * @param args the command line arguments
      */
@@ -1147,6 +1012,7 @@ public class GUI2 extends javax.swing.JFrame {
     private javax.swing.JMenu editMenu;
     private javax.swing.JButton exit;
     private javax.swing.JMenuItem exitMenuItem;
+    private javax.swing.JFileChooser fileChooser;
     private javax.swing.JMenu fileMenu;
     private javax.swing.JButton helpButton;
     private javax.swing.JMenu helpMenu;
@@ -1167,7 +1033,6 @@ public class GUI2 extends javax.swing.JFrame {
     private javax.swing.JMenuItem saveAsMenuItem;
     private javax.swing.JButton saveButton;
     private javax.swing.JMenuItem saveMenuItem;
-    private javax.swing.JButton stepButton;
     private javax.swing.JList<String> suggestedWords;
     private javax.swing.JTextPane textPane;
     // End of variables declaration//GEN-END:variables

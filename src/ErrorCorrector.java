@@ -53,12 +53,19 @@ public class ErrorCorrector {
             //Load the wordlist
             String inputline = probsReader.readLine();
 
+            int threshold = 3710; //IsiXhosa
+
+            //Set frequency for isiZulu
+            if (language.equalsIgnoreCase("isizulu")) {
+                threshold = 3256;
+            }
+
             //Scanner sc = new Scanner(new FileInputStream(new File("trigrams2.txt")));
             while (inputline != null) {
                 String[] line = inputline.split(" ");// sc.nextLine().split(" ");
                 String tri = line[0];
                 int freq = Integer.parseInt(line[1]);
-                if (freq >= 45) {
+                if (freq >= threshold) {
                     hashTri.put(tri, freq);
                     triArray.add(tri);
                 }
@@ -93,7 +100,7 @@ public class ErrorCorrector {
             String word = sword;
             //check if the word is capitalized or the first letter is capitalized and change to lowercase
             word = uppercase(word);
-            System.out.println(word);
+            //System.out.println(word);
             //create trigram of word and store in an arrTrig
             int len = word.length();
             String tri = "";
@@ -148,7 +155,7 @@ public class ErrorCorrector {
                         }
                     }
                 } else { //if any trigram is found to be incorrectly spelt
-                    System.out.println(arrTrig.get(i).getTri());
+                   // System.out.println(arrTrig.get(i).getTri());
                     char[] charArr = source.toCharArray();
                     int count = 0;
                     int start_index = 0;

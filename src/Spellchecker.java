@@ -13,6 +13,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -20,6 +22,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.BorderFactory;
@@ -47,9 +50,9 @@ import javax.swing.text.StyleContext;
 import javax.swing.text.StyledDocument;
 import javax.swing.text.Utilities;
 
-/*import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFRun;*/
+import org.apache.poi.xwpf.usermodel.XWPFRun;
 /**
  *
  * @author Norman_P
@@ -731,6 +734,8 @@ public class Spellchecker extends javax.swing.JFrame {
              * CardLayout cl = (CardLayout) corrections.getLayout();
              * cl.show(corrections, "none");
              */
+            //System.out.println("Position "+textPane.viewToModel(pt));
+            
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1193,7 +1198,9 @@ public class Spellchecker extends javax.swing.JFrame {
                     doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
                 }
                 if (name.endsWith(".docx")) {
-                    /*FileInputStream fis = new FileInputStream(file.getAbsolutePath());
+                    FileInputStream fis = new FileInputStream(file.getAbsolutePath());
+                    System.out.println(file.getAbsolutePath());
+                    
                     XWPFDocument docx = new XWPFDocument(fis);
                     List<XWPFParagraph> pars = docx.getParagraphs();
                     String toDisplay = "";
@@ -1203,7 +1210,7 @@ public class Spellchecker extends javax.swing.JFrame {
 
                     textPane.setText(toDisplay);
                     text = textPane.getText();
-                    docx.close();*/
+                    //docx.close();
                 } else {
                     textPane.read(new FileReader(file.getAbsolutePath()), null);
                     text = textPane.getText(); //for controlling the displayed text
@@ -1247,13 +1254,13 @@ public class Spellchecker extends javax.swing.JFrame {
                     doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
                 }
                 if (file.getName().endsWith(".docx")) {
-                    /*XWPFDocument document = new XWPFDocument();
+                    XWPFDocument document = new XWPFDocument();
                     XWPFParagraph tmpParagraph = document.createParagraph();
                     XWPFRun tmpRun = tmpParagraph.createRun();
                     tmpRun.setText(textPane.getText());
                     tmpRun.setFontSize(12);
                     document.write(new FileOutputStream(new File(file.getPath())));
-                    document.close();*/
+                    
                 } else {
                     textPane.write(new FileWriter(file.getAbsolutePath()));//this file has no extension
                 }
@@ -1301,6 +1308,7 @@ public class Spellchecker extends javax.swing.JFrame {
 
     private void textAreaKeyTyped(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_textAreaKeyTyped
         int len = textPane.getText().length();
+        
         StyledDocument doc = textPane.getStyledDocument();
         Style defaultStyle = StyleContext.getDefaultStyleContext().
                 getStyle(StyleContext.DEFAULT_STYLE);

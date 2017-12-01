@@ -72,13 +72,17 @@ public class Model extends ErrorCorrector{
         //Get trigrams of the word
         ArrayList<String> trigrams = wordTrigram(word);
         boolean error = false;
-        double probability, threshold = 45;//0.019;
-        int totalWords = trigramMap.size(); 
+        double frequency, threshold = 3710;//Frequency for isiXhosa
 
+        //Set frequency for isiZulu
+        if(language.equalsIgnoreCase("isizulu")){
+            threshold = 3256;
+        }
+        
         //calculate the probability of each trigram and check for correctness
         for (String trigram : trigrams) {
-            probability = getFrequency(trigram); //(double) getFrequency(trigram) / (double) totalWords;
-            if (probability < threshold) {
+            frequency = getFrequency(trigram); 
+            if (frequency < threshold) {
                 error = false; //the trigam is incorrect
                 break; //No neeed to continue iterations
             } else {
@@ -161,6 +165,7 @@ public class Model extends ErrorCorrector{
             String[] entry;
             while (line != null) {
                 entry = line.split(" ");//trigram and frequency
+                //sumFrequencies += Integer.parseInt(entry[1]);
                 trigramMap.put(entry[0], Integer.parseInt(entry[1]));
                 line = trigramReader.readLine();
             }
@@ -210,6 +215,7 @@ public class Model extends ErrorCorrector{
                 dictDatabas +=  word;
                 bw.write(dictDatabas);
                 bw.close();
+                System.out.println("Write complete");
             } else {
                 fw = new FileWriter(dict);
                 bw = new BufferedWriter(fw);
@@ -218,6 +224,7 @@ public class Model extends ErrorCorrector{
                 dictDatabas += "\n" + word;
                 bw.write(dictDatabas);
                 bw.close();
+                System.out.println("Write complete2 "+ dictDatabas);
             }
 
         } catch (IOException ex) {
