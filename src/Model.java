@@ -215,7 +215,6 @@ public class Model extends ErrorCorrector{
                 dictDatabas +=  word;
                 bw.write(dictDatabas);
                 bw.close();
-                System.out.println("Write complete");
             } else {
                 fw = new FileWriter(dict);
                 bw = new BufferedWriter(fw);
@@ -224,7 +223,6 @@ public class Model extends ErrorCorrector{
                 dictDatabas += "\n" + word;
                 bw.write(dictDatabas);
                 bw.close();
-                System.out.println("Write complete2 "+ dictDatabas);
             }
 
         } catch (IOException ex) {
