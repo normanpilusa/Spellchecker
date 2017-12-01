@@ -42,7 +42,14 @@ public class Model extends ErrorCorrector{
      * Checks word in wordlist before doing error detection
      * returns true if correct
      */
-    public boolean check(String str) {
+    public boolean check(String word) {
+        String str = word;
+        
+        //Removes non-Alphabetic last char
+         if (!Character.isLetter(str.charAt(word.length()-1))) {
+             str = word.substring(0,word.length()-1 );
+         }
+        
         if(str.length() < 3){
             return true;
         }
@@ -54,6 +61,7 @@ public class Model extends ErrorCorrector{
             return errorDetection(str);
         }
     }
+
 
     /*
      * Searches for a word from wordlist
@@ -72,11 +80,11 @@ public class Model extends ErrorCorrector{
         //Get trigrams of the word
         ArrayList<String> trigrams = wordTrigram(word);
         boolean error = false;
-        double frequency, threshold = 3710;//Frequency for isiXhosa
+        double frequency, threshold = 700;//Frequency for isiXhosa
 
         //Set frequency for isiZulu
         if(language.equalsIgnoreCase("isizulu")){
-            threshold = 3256;
+            threshold = 45;
         }
         
         //calculate the probability of each trigram and check for correctness

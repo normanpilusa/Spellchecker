@@ -1,12 +1,11 @@
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Font;
-import java.awt.Point;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -14,28 +13,26 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.BorderFactory;
-import javax.swing.JEditorPane;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
-import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultEditorKit;
-import javax.swing.text.DefaultHighlighter;
-import javax.swing.text.Element;
-import javax.swing.text.Highlighter;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
 import javax.swing.text.StyledDocument;
 import javax.swing.text.Utilities;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -57,12 +54,7 @@ public class GUI2 extends javax.swing.JFrame {
     private final String[] NOSUGGESTION = {"No suggestions"};
     Style defaultStyle = StyleContext.getDefaultStyleContext().
             getStyle(StyleContext.DEFAULT_STYLE);
-
     int position = 0; //The word position in the text area
-    boolean endOfText = false;
-    boolean highlightSet = false; //Used to clear text area
-
-    Highlighter.HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.YELLOW);
     ArrayList<String> all = new ArrayList<>(); //Ignored all
 
     /**
@@ -557,10 +549,6 @@ public class GUI2 extends javax.swing.JFrame {
             instruction.setText("Type or paste text or Click File -> Open file... to load a file!");
             instruction.setForeground(Color.red);
             return;
-        } else if (noErrors()) {
-            instruction.setText("No errors detected!");
-            instruction.setForeground(Color.BLUE);
-            return;
         } else {
             instruction.setText("Double click on errors to make correction one at a time");
             instruction.setForeground(Color.BLUE);
@@ -569,7 +557,8 @@ public class GUI2 extends javax.swing.JFrame {
         String[] sentences = text.split("\n");
         String[] words;
         int start;
-        int position = 0;
+        int pos = 0;
+        boolean noErrors = true;
 
         //Input is just a sentence or word
         for (int sentence = 0; sentence < sentences.length; sentence++) {
@@ -577,13 +566,23 @@ public class GUI2 extends javax.swing.JFrame {
 
             //iterate through words
             for (String word : words) {
+                if (pos == 0) {
+                    word = word.toLowerCase();
+                }
                 if (!all.contains(word) && !m.check(word)) {
-                    start = text.indexOf(word, position);
+                    start = text.indexOf(word, pos);
                     StyledDocument doc = textPane.getStyledDocument();
                     doc.setCharacterAttributes(start, word.length(), fore_red, true);
+                    noErrors = false;
                 }
-                position += word.length() + 1;
+                pos += word.length() + 1;
             }
+        }
+
+        //Change instruction
+        if (noErrors) {
+            instruction.setText("No errors detected!");
+            instruction.setForeground(Color.BLUE);
         }
     }//GEN-LAST:event_runButtonActionPerformed
 
@@ -615,7 +614,7 @@ public class GUI2 extends javax.swing.JFrame {
             helpWindow.setVisible(true);
 
         } catch (IOException ex) {
-            Logger.getLogger(Spellchecker.class.getName()).log(Level.SEVERE, null, ex);
+            //Logger.getLogger(Spellchecker.class.getName()).log(Level.SEVERE, null, ex);
             System.out.println("File not found");
         }
     }//GEN-LAST:event_helpButtonActionPerformed
@@ -653,16 +652,16 @@ public class GUI2 extends javax.swing.JFrame {
         //Clear error highlights
         StyledDocument doc = textPane.getStyledDocument();
         doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
-        
+
         //Remove previous suggestions
         suggestedWords.setListData(NOSUGGESTION);
         suggestedWords.setForeground(Color.lightGray);
-        
+
         //Give aproprate instruction
         instruction.setText("Click run to refresh errors");
         instruction.setForeground(Color.BLUE);
-        
-        
+
+
     }//GEN-LAST:event_languageDropdownItemStateChanged
 
     private void openMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openMenuItemActionPerformed
@@ -682,14 +681,12 @@ public class GUI2 extends javax.swing.JFrame {
 
             try {
                 // What to do with the file, e.g. display it in a TextArea
-                if (highlightSet) {
-                    StyledDocument doc = textPane.getStyledDocument();
-                    Style defaultStyle = StyleContext.getDefaultStyleContext().
-                            getStyle(StyleContext.DEFAULT_STYLE);
-                    doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
-                }
+
+                StyledDocument doc = textPane.getStyledDocument();
+                doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
+
                 if (name.endsWith(".docx")) {
-                    /*FileInputStream fis = new FileInputStream(file.getAbsolutePath());
+                    FileInputStream fis = new FileInputStream(openedFile.getAbsolutePath());
                     XWPFDocument docx = new XWPFDocument(fis);
                     List<XWPFParagraph> pars = docx.getParagraphs();
                     String toDisplay = "";
@@ -699,7 +696,7 @@ public class GUI2 extends javax.swing.JFrame {
 
                     textPane.setText(toDisplay);
                     text = textPane.getText();
-                    docx.close();*/
+                    docx.close();
                 } else {
                     textPane.read(new FileReader(openedFile.getAbsolutePath()), null);
                     text = textPane.getText(); //for controlling the displayed text
@@ -728,12 +725,10 @@ public class GUI2 extends javax.swing.JFrame {
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             try {
                 // What to do with the file, e.g. display it in a TextArea
-                if (highlightSet) {
-                    StyledDocument doc = textPane.getStyledDocument();
-                    Style defaultStyle = StyleContext.getDefaultStyleContext().
-                            getStyle(StyleContext.DEFAULT_STYLE);
-                    doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
-                }
+
+                StyledDocument doc = textPane.getStyledDocument();
+                doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
+
                 if (openedFile.getName().endsWith(".docx")) {
                     /*XWPFDocument document = new XWPFDocument();
                     XWPFParagraph tmpParagraph = document.createParagraph();
@@ -766,12 +761,10 @@ public class GUI2 extends javax.swing.JFrame {
             File file = fileChooser.getSelectedFile();
             try {
                 // What to do with the file, e.g. display it in a TextArea
-                if (highlightSet) {
-                    StyledDocument doc = textPane.getStyledDocument();
-                    Style defaultStyle = StyleContext.getDefaultStyleContext().
-                            getStyle(StyleContext.DEFAULT_STYLE);
-                    doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
-                }
+
+                StyledDocument doc = textPane.getStyledDocument();
+                doc.setCharacterAttributes(0, doc.getLength(), defaultStyle, true);
+
                 if (file.getName().endsWith(".docx")) {
                     /*XWPFDocument document = new XWPFDocument();
                     XWPFParagraph tmpParagraph = document.createParagraph();
@@ -908,7 +901,7 @@ public class GUI2 extends javax.swing.JFrame {
             helpWindow.setVisible(true);
 
         } catch (IOException ex) {
-            Logger.getLogger(Spellchecker.class.getName()).log(Level.SEVERE, null, ex);
+            //Logger.getLogger(Spellchecker.class.getName()).log(Level.SEVERE, null, ex);
             System.out.println("File not found");
         }
     }//GEN-LAST:event_contentsMenuItemActionPerformed
@@ -933,38 +926,6 @@ public class GUI2 extends javax.swing.JFrame {
         }
         suggestedWords.setListData(suggestions);
 
-    }
-
-    /**
-     * Checks for all errors
-     */
-    private boolean noErrors() {
-        String[] sentences = textPane.getText().split("\n");
-        String[] words;
-        int sentence = 0;
-
-        if (sentences.length < 2) {
-            words = textPane.getText().split(" ");
-            //iterate through words
-            for (String word : words) {
-                if (!all.contains(word) && !m.check(word)) {//incorrect word
-                    return false;
-                }
-            }
-            //Input is a two or more lines
-        } else {
-            while (sentence < sentences.length) {
-                words = sentences[sentence].split(" ");
-                //iterate through words
-                for (String word : words) {
-                    if (!all.contains(word) && !m.check(word)) {
-                        return false;
-                    }
-                }
-                sentence++;
-            }
-        }
-        return true;
     }
 
     /**

@@ -53,11 +53,11 @@ public class ErrorCorrector {
             //Load the wordlist
             String inputline = probsReader.readLine();
 
-            int threshold = 3710; //IsiXhosa
+            int threshold = 700; //IsiXhosa
 
             //Set frequency for isiZulu
             if (language.equalsIgnoreCase("isizulu")) {
-                threshold = 3256;
+                threshold = 45;
             }
 
             //Scanner sc = new Scanner(new FileInputStream(new File("trigrams2.txt")));
